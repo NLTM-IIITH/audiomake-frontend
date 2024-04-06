@@ -340,9 +340,9 @@ class ReactCropper extends Component {
     const { src, alt, crossOrigin } = this.props;
 
     return (
-      <div style={{ clear: "both" }}>
-        {/* 用于渲染Cropper */}
-        <div style={{ paddingRight: "0", float: "left" }}>
+      <div className="flex gap-x-6">
+        {/* Cropper */}
+        <div>
           <div
             src={null}
             crossOrigin={null}
@@ -350,6 +350,8 @@ class ReactCropper extends Component {
             style={this.props.style}
             className={this.props.className}
           >
+            <div className="border-4 border-slate-300">
+              
             <TransformWrapper 
               initialScale={1}
             >
@@ -365,11 +367,12 @@ class ReactCropper extends Component {
                 />
               </TransformComponent>
             </TransformWrapper>
+            </div>
           </div>
         </div>
 
-        {/* 用于渲染所有CropBox的数据 */}
-        <div style={{ float: "right" }}>
+        {/* CropBox */}
+        <div>
           <CropBoxDatasInfo
             key={src}
             cropper={this.cropper} // 渲染的Cropper
