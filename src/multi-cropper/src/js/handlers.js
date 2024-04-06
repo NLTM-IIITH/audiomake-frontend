@@ -240,17 +240,7 @@ export default {
 //Dalaoshe Modification
   // cropBox双击删除
   cropBoxDblclick(event) {
-	let self = this;
-	let e = $.getEvent(event);
-	let dbCropBox = e.target;
-	let identifier = $.getData(dbCropBox, 'cropperidentifier');
-	let index = self.getCropBoxIndexByIdentifier(identifier);
-	if(index !== -1) {
-		//console.log("delete identifier:" + identifier + " index:" + index);	
-		self.destroyCropBoxByIndex(index);
-		e.stopPropagation();
-		e.preventDefault();
-	}
+	
  },
  // cropBox点击切换激活
  handleCropBoxChangedIndex(index) {

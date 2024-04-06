@@ -2,11 +2,16 @@ import React, { Component, useState } from "react";
 import axios from "axios";
 
 // UI Imports
-import { Select, Button } from "antd";
-import { Card as Cardx, CardHeader, CardBody, CardFooter, Image, Stack, Heading, Text, Divider, ButtonGroup, Box, Input as Inputx, InputGroup, InputLeftAddon, Grid, Textarea, Flex, Badge, Tooltip } from "@chakra-ui/react";
+import { Select } from "antd";
+import { Card as Cardx, CardHeader, CardBody, CardFooter, Image, Stack, Heading, Text, Divider, ButtonGroup, Box, Input as Inputx, InputGroup, InputLeftAddon, Grid, Textarea, Flex, Badge, Tooltip, Button } from "@chakra-ui/react";
 import { RiFileCopyFill } from "react-icons/ri";
 import { RxReload } from "react-icons/rx";
 import { MdDeleteForever } from "react-icons/md";
+import { ImParagraphJustify } from "react-icons/im";
+import { LuHeading } from "react-icons/lu";
+import { CiViewTable } from "react-icons/ci";
+import { CiImageOn } from "react-icons/ci";
+import { TbMathFunction } from "react-icons/tb";
 
 // CSS Import
 import "./App.css";
@@ -17,12 +22,8 @@ import * as $ from "./multi-cropper/src/js/utilities";
 import Navbar from "./components/Navbar";
 import Controls from "./components/Controls";
 
-
-const Option = Select.Option;
-
 // App Component
 class App extends Component {
-
   // Constructors and states
   constructor(props) {
     super(props);
@@ -45,8 +46,16 @@ class App extends Component {
       layoutVersion: "V-01.00.01",
       loading: false,
       server: "bhashini",
+      selectedButton: "Paragraph",
+      boundingBoxCollection: [],
     };
   }
+
+  handleButtonClick = (buttonName) => {
+    this.setState(prevState => ({
+      selectedButton: prevState.selectedButton === buttonName ? "Paragraph" : buttonName
+    }));
+  };
 
   /**
    * @handleImageUpload
@@ -67,17 +76,17 @@ class App extends Component {
   /**
    * @newCropBox_is_Created
   * */
+
   newCropBox() {
     document.addEventListener("mouseup", this.handleMouseUp);
   }
-  
-  handleMouseUp () {
-    console.log("Iam")
+
+  handleMouseUp() {
     document.removeEventListener("mouseup", this.handleMouseUp);
     const cropBoxDatas = this.cropper.getCropBoxDatas();
     console.log(cropBoxDatas);
     this.setState({ loading: false });
-  
+
     const updatedCropBoxesData = cropBoxDatas.map((cropBoxData, index) => {
       const existingCropBoxData = this.state.cropBoxesData[index] || {};
       return {
@@ -85,21 +94,21 @@ class App extends Component {
         ...cropBoxData,
       };
     });
-  
+
     // Update the state with the new crop box datas
     this.setState(
       {
         cropBoxesData: updatedCropBoxesData,
+        boundingBoxCollection: this.state.boundingBoxCollection,
       },
       () => {
         this.sendCroppedImages({ language: "english", modality: "printed" });
       }
     );
   }
-  
-  
+
   // Cropbox events
-  destroyCropBox(event) {
+  destroyCropBox() {
     this.forceUpdate();
   }
 
@@ -143,7 +152,7 @@ class App extends Component {
   /**
    * @send_cropBoxes
   * */
- 
+
   async sendCroppedImages(options) {
     try {
       this.setState({ loading: true });
@@ -157,8 +166,8 @@ class App extends Component {
         const formData = new FormData();
         formData.append("image", croppedImages[i]);
         formData.append("language", language);
-        formData.append("version", "v4_robust");
-        formData.append("modality", "printed");
+        formData.append("version", "v4_robust"); // hard coded
+        formData.append("modality", "printed"); // hard coded
 
         const response = await axios.post(
           "http://localhost:5000/upload",
@@ -195,11 +204,58 @@ class App extends Component {
     this.sendCroppedImages();
   }
 
-  handleSaveAndRun(){
+  handleSaveAndRun() {
     this.sendCroppedImages();
   }
 
   render() {
+    const { selectedButton } = this.state;
+
+    console.log(this.state.boundingBoxCollection);
+    console.log("current length is " + this.state.boundingBoxCollection.length);
+
+    var boundingBoxes = Array.from(document.querySelectorAll('.cropper-face'));
+    console.log(boundingBoxes);
+
+    if (boundingBoxes.length > 0) {
+      boundingBoxes.forEach(elem => {
+        let elemP = elem.getAttribute("data-cropperidentifier"); // unique property
+        let cat = selectedButton; // current property
+        let dict = { key: elemP, category: cat };
+
+        // Check if dict with the same key already exists in boundingBoxCollection
+        if (!this.state.boundingBoxCollection.some(item => item.key === elemP)) {
+          this.setState(prevState => ({
+            boundingBoxCollection: [...prevState.boundingBoxCollection, dict]
+          }));
+        }
+      });
+    }
+
+    let collection = this.state.boundingBoxCollection;
+
+    collection.forEach(item => {
+      let key = document.querySelector(`.cropper-face[data-cropperidentifier='${item.key}']`)
+      let cat = item.category;
+      switch (cat) {
+        case "Paragraph":
+          key.style.backgroundColor = "#805AD5";
+          break;
+        case "Heading":
+          key.style.backgroundColor = "#E53E3E";
+          break;
+        case "Table":
+          key.style.backgroundColor = "#38A169";
+          break;
+        case "Image":
+          key.style.backgroundColor = "#3182ce";
+          break;
+        case "Equation":
+          key.style.backgroundColor = "#ECC94B";
+          break;
+      }
+    })
+
     return (
       <div>
         <Navbar />
@@ -218,66 +274,99 @@ class App extends Component {
         />
 
         <div>
-          {!this.state.imageUploaded && (
-            <div className="p-10">
-              <h1 className="font-semibold text-xl pb-10">
-                Upload an Image to get started
-              </h1>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={this.handleImageUpload}
-              />
+          <div>
+            {!this.state.imageUploaded && (
+              <div className="p-10">
+                <h1 className="font-semibold text-xl pb-10">
+                  Upload an Image to get started
+                </h1>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={this.handleImageUpload}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex py-6">
+          {this.state.imgSrc && (
+            <div className="p-4">
+              <div className="flex flex-col gap-y-2">
+                <Button colorScheme='purple' width='130px' variant={selectedButton === 'Paragraph' ? 'solid' : 'outline'} onClick={() => this.handleButtonClick('Paragraph')} >
+                  <Box as={ImParagraphJustify} marginRight="2" />
+                  Paragraph
+                </Button>
+                <Button colorScheme='red' width='130px' variant={selectedButton === 'Heading' ? 'solid' : 'outline'} onClick={() => this.handleButtonClick('Heading')} >
+                  <Box as={LuHeading} marginRight="2" />
+                  Heading
+                </Button>
+                <Button colorScheme='green' width='130px' variant={selectedButton === 'Table' ? 'solid' : 'outline'} onClick={() => this.handleButtonClick('Table')} >
+                  <Box as={CiViewTable} marginRight="2" />
+                  Table
+                </Button>
+                <Button colorScheme='blue' width='130px' variant={selectedButton === 'Image' ? 'solid' : 'outline'} onClick={() => this.handleButtonClick('Image')} >
+                  <Box as={CiImageOn} marginRight="2" />
+                  Image
+                </Button>
+                <Button colorScheme='yellow' width='130px' variant={selectedButton === 'Equation' ? 'solid' : 'outline'} onClick={() => this.handleButtonClick('Equation')} >
+                  <Box as={TbMathFunction} marginRight="2" />
+                  Equation
+                </Button>
+              </div>
             </div>
           )}
-        </div>
-        {this.state.imgSrc && (
-          <div className="p-10">
-            {/* {<TransformWrapper initialScale={1}>
+
+          <div>
+            {this.state.imgSrc && (
+              <div>
+                {/* {<TransformWrapper initialScale={1}>
               <TransformComponent>} */}
-            <Cropper
-              style={{ height: 420, width: 740 }}
-              autoCrop={false}
-              autoCropArea={0.3}
-              guides={true}
-              movable={false}
-              scalable={false}
-              rotatable={false}
-              zoomable={false}
-              cropend={this.moveEnd}
-              newcropbox={this.newCropBox}
-              destroycropbox={this.destroyCropBox}
-              renderCropBox={this.renderCropBox}
-              buildover={this.cropBuildOver}
-              params={{
-                types: ["woman", "dog", "cat"],
-              }}
-              src={this.state.imgSrc}
-              ref={(cropper) => {
-                this.cropper = cropper;
-              }}
-            />
-            {/* {</TransformComponent>
+                <Cropper
+                  style={{ height: 420, width: 740 }}
+                  autoCrop={false}
+                  autoCropArea={0.3}
+                  guides={true}
+                  movable={false}
+                  scalable={false}
+                  rotatable={false}
+                  zoomable={false}
+                  cropend={this.moveEnd}
+                  newcropbox={this.newCropBox}
+                  destroycropbox={this.destroyCropBox}
+                  renderCropBox={this.renderCropBox}
+                  buildover={this.cropBuildOver}
+                  params={{
+                    types: ["woman", "dog", "cat"],
+                  }}
+                  src={this.state.imgSrc}
+                  ref={(cropper) => {
+                    this.cropper = cropper;
+                  }}
+                />
+                {/* {</TransformComponent>
             </TransformWrapper>} */}
+              </div>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   }
 
   /**
-   * @handling_functions
-  * */
+  * @handling_functions
+  **/
 
   handleToDestroyCropBox = (event) => {
     const index = event.currentTarget.getAttribute("cropboxindex");
     if (index !== null) {
       const cropBoxIndex = parseInt(index, 10);
-      const activeCropBoxIndex = this.cropper.getNowCropBoxIndex();
-      // If the clicked crop box is active, destroy it
-      if (cropBoxIndex === activeCropBoxIndex) {
-        this.cropper.destroyCropBoxByIndex(cropBoxIndex);
-      }
+      const updatedBoundingBoxCollection = [...this.state.boundingBoxCollection];
+      updatedBoundingBoxCollection.splice(cropBoxIndex, 1);
+      this.setState({ boundingBoxCollection: updatedBoundingBoxCollection });
+      this.cropper.destroyCropBoxByIndex(cropBoxIndex);
     }
   };
 
@@ -302,14 +391,14 @@ class App extends Component {
       this.setState({ loading: true });
       const cropBoxesData = await this.getCroppedImages();
       const cropBoxData = cropBoxesData[index];
-      console.log("current language on reload is "+ this.state.language);
+      console.log("current language on reload is " + this.state.language);
 
       const clearCropBoxesData = [...this.state.cropBoxesData];
-          clearCropBoxesData[index] = {
-          ...clearCropBoxesData[index],
-          ocrText: '',
-        };
-        this.setState({ cropBoxesData: clearCropBoxesData });
+      clearCropBoxesData[index] = {
+        ...clearCropBoxesData[index],
+        ocrText: '',
+      };
+      this.setState({ cropBoxesData: clearCropBoxesData });
 
       if (cropBoxData) {
 
@@ -384,36 +473,35 @@ class App extends Component {
     }
   };
 
-  wordsLen(str) { 
-    const array = str.trim().split(/\s+/); 
-    return array.length; 
+  wordsLen(str) {
+    const array = str.trim().split(/\s+/);
+    return array.length;
   }
 
   downloadTextFile() {
     const { cropBoxesData } = this.state;
 
-    if(cropBoxesData.length === 0){
+    if (cropBoxesData.length === 0) {
       alert("Please select a region in the image to continue.");
       return;
     }
 
     const allText = cropBoxesData.map((box) => box.ocrText).join('\n');
-  
+
     const blob = new Blob([allText], { type: 'text/plain' });
-  
+
     const url = URL.createObjectURL(blob);
-  
+
     const a = document.createElement('a');
     a.href = url;
-    var currentdate = new Date(); 
-    var datetime = "AccurateOCR_" + currentdate.getDate() + "/" + (currentdate.getMonth()+1) + "/" + currentdate.getFullYear() + "@" + currentdate.getHours() + "_" + currentdate.getMinutes() + "_"+ currentdate.getSeconds();
+    var currentdate = new Date();
+    var datetime = "AccurateOCR_" + currentdate.getDate() + "/" + (currentdate.getMonth() + 1) + "/" + currentdate.getFullYear() + "@" + currentdate.getHours() + "_" + currentdate.getMinutes() + "_" + currentdate.getSeconds();
     a.download = `${datetime}.txt`;
-  
+
     a.click();
-  
+
     URL.revokeObjectURL(url);
   }
-  
 
   /**
    * @Card_UI
@@ -440,6 +528,7 @@ class App extends Component {
     }
 
     const { cropBoxesData } = this.state;
+    console.log(cropBoxesData);
     let res = [];
 
     for (let i = 0; i < datas.length; ++i) {
@@ -450,7 +539,24 @@ class App extends Component {
           : "";
       let actived = this.cropper.getNowCropBoxIndex() === i;
       let displaycolor = actived ? "#bee3f8" : "#ebf8ff";
-      let boxShadow = actived? "rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px" : "white";
+      let boxShadow = actived ? "rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px" : "white";
+
+      let collection = this.state.boundingBoxCollection[i];
+      let typex, colorx;
+      if (collection) {
+        typex = collection.category;
+        if (typex === "Paragraph") {
+          colorx = "purple";
+        } else if (typex === "Heading") {
+          colorx = "red";
+        } else if (typex === "Table") {
+          colorx = "green";
+        } else if (typex === "Image") {
+          colorx = "blue";
+        } else if (typex === "Equation") {
+          colorx = "yellow";
+        }
+      }
 
       if (this.state.cropBoxesData[i] && this.state.cropBoxesData[i].ocrText) {
         ocrText = this.state.cropBoxesData[i].ocrText;
@@ -460,7 +566,7 @@ class App extends Component {
 
       const label = i + 1;
 
-      const labelPositionX = data.x + 20; 
+      const labelPositionX = data.x + 20;
       const labelPositionY = data.y + 100;
 
       res.push(
@@ -485,9 +591,12 @@ class App extends Component {
 
           <Cardx width={600} backgroundColor={displaycolor} boxShadow={boxShadow}>
             <CardBody className="flex justify-between">
-              <Stack spacing="3">
+              <div className="flex gap-x-4">
                 <Heading size="md">{"Region" + (i + 1)}</Heading>
-              </Stack>
+                <div>
+                  <Badge colorScheme={colorx}>{typex}</Badge>
+                </div>
+              </div>
 
               <Flex className="py-2 px-10 gap-x-10">
                 <RiFileCopyFill
@@ -562,27 +671,42 @@ class App extends Component {
             </div>
 
             <Divider />
-            <div style={{ padding: "1rem" }}>
-              <Textarea
-                size="sm"
-                placeholder= {this.state.loading ? "Loading..." : "OCR Text" }
-                value={ocrText}
-                onChange={(e) => this.handleOCRTextChange(i, e)}
-              />
-            </div>
-            <Divider />
 
-            <CardFooter>
-              <div className="flex justify-center gap-x-6">
-                <SelectLanguage
-                  language={this.state.language}
-                  onLanguageChange={this.handleLanguageChange}
-                />
-                <SelectModality modality={modality} />
-                <SelectOCRVersion ocrVersion={ocrVersion} />
-                <SelectLayoutVersion layoutVersion={layoutVersion} />
-              </div>
-            </CardFooter>
+            {
+              (typex === "Paragraph" || typex === "Heading" || typex === "Table") ?
+               (
+                <div>
+                <div style={{ padding: "1rem" }}>
+                  <Textarea
+                    size="sm"
+                    placeholder={this.state.loading ? "Loading..." : "OCR Text"}
+                    value={ocrText}
+                    onChange={(e) => this.handleOCRTextChange(i, e)}
+                  />
+                </div>
+                <Divider />
+
+                <CardFooter>
+                  <div className="flex justify-center gap-x-6">
+                    <SelectLanguage
+                      language={this.state.language}
+                      onLanguageChange={this.handleLanguageChange}
+                    />
+                    <SelectModality modality={modality} />
+                    <SelectOCRVersion ocrVersion={ocrVersion} />
+                    <SelectLayoutVersion layoutVersion={layoutVersion} />
+                  </div>
+                </CardFooter>
+              </div> 
+               ) :  
+              (
+                <div>
+                  <CardFooter>
+                    {typex} embedded
+                  </CardFooter>
+                </div>
+            )
+            }
           </Cardx>
         </div>
       );
@@ -591,7 +715,7 @@ class App extends Component {
   }
 }
 
-  const SelectLanguage = ({ language, onLanguageChange }) => {
+const SelectLanguage = ({ language, onLanguageChange }) => {
 
   const handleChange = (value) => {
     onLanguageChange(value);
