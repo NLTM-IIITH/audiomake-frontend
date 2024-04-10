@@ -49,6 +49,7 @@ class App extends Component {
       server: "bhashini",
       selectedButton: "Paragraph",
       boundingBoxCollection: [],
+      newCropBoxData: null,
     };
   }
 
@@ -87,9 +88,7 @@ class App extends Component {
     event.preventDefault();
     event.stopPropagation();
 
-    const cropBoxDatas = this.cropper.getCropBoxDatas();
-    console.log("these are the initial crop boxes");
-    console.log(cropBoxDatas);
+    const cropBoxData = this.cropper.getCropBoxDatas()[0];
 
     // const updatedCropBoxesData = cropBoxDatas.map((cropBoxData, index) => {
     //   const existingCropBoxData = this.state.cropBoxesData[index] || {};
@@ -99,7 +98,7 @@ class App extends Component {
     //   };
     // });
 
-    this.setState({ loading: false, cropBoxesData: cropBoxDatas }, () => {
+    this.setState({ loading: false, newCropBoxData: cropBoxData }, () => {
       this.sendCroppedImages({ language: "english", modality: "printed" });
     });
 
@@ -155,6 +154,19 @@ class App extends Component {
     // console.log(event);
   };
 
+  getCroppedImage(cropBoxData) {
+    return new Promise((resolve) => {
+      this.cropper.setCropBoxData(cropBoxData);
+      const canvas = this.cropper.getCroppedCanvas();
+      canvas.toBlob((blob) => {
+        const file = new File([blob], `crop.png`, {
+          type: "image/png",
+        });
+        resolve(file);
+      });
+    });
+  }
+
   /**
    * @get_all_the_crop_boxes
   * */
@@ -179,8 +191,6 @@ class App extends Component {
           });
         });
       });
-      console.log("cropped promises");
-      console.log(cropPromises);
       return Promise.all(cropPromises);
     }
     return Promise.resolve(croppedImages);
@@ -191,57 +201,40 @@ class App extends Component {
   * */
 
    // there is something wrong here that's why there is inconsistency while sending the cropped images and getting same o/p
-  async sendCroppedImages(options) {
+   async sendCroppedImages(options) {
     try {
       this.setState({ loading: true });
-      const croppedImages = await this.getCroppedImages();
-      console.log("I am inside sending function");
-      console.log(croppedImages);
-
-      const language = this.state.language;
-      const updatedCropBoxesData = [...this.state.cropBoxesData];
-
-      // console.log("length is" + croppedImages.length);
-      for (let i = 0; i < croppedImages.length; i++) {
-        const formData = new FormData();
-        formData.append("image", croppedImages[i]);
-        formData.append("language", language);
-        formData.append("version", "v4_robust"); // hard coded
-        formData.append("modality", "printed"); // hard coded
-
-        const response = await axios.post(
-          "10.4.16.80:5000/upload",
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-            },
-          }
-        );
-
-        console.log("API call success");
-
-        let ocr = response.data.text;
-
-        // console.log(ocr);
-        // this.setState({ loading: false });
-
-        // const updatedCropBoxesData = [...this.state.cropBoxesData];
-        updatedCropBoxesData[i] = {
-          ...updatedCropBoxesData[i],
-          ocrText: ocr,
-        };
-
-        this.setState({ cropBoxesData: updatedCropBoxesData });
-        // this.setState(prevState => ({
-        //   loading: false,
-        //   cropBoxesData: prevState.cropBoxesData.map((cropBox, index) =>
-        //     index === i ? { ...cropBox, ocrText: ocr } : cropBox
-        //   ),
-        // }));
+      const { newCropBoxData, cropBoxesData, language } = this.state;
+  
+      if (newCropBoxData) {
+        const croppedImage = await this.getCroppedImage(newCropBoxData);
+  
+        if (croppedImage) {
+          const formData = new FormData();
+          formData.append("image", croppedImage);
+          formData.append("language", language);
+          formData.append("version", "v4_robust");
+          formData.append("modality", "printed");
+  
+          const response = await axios.post(
+            "http://localhost:5000/upload",
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+            }
+          );
+  
+          const ocr = response.data.text;
+          const updatedCropBoxData = { ...newCropBoxData, ocrText: ocr };
+          const updatedCropBoxesData = [...cropBoxesData, updatedCropBoxData];
+  
+          this.setState({ cropBoxesData: updatedCropBoxesData, newCropBoxData: null, loading: false });
+        }
       }
     } catch (error) {
-      console.error("Error sendingCroppedImages" + error); 
+      console.error("Error sendingCroppedImages" + error);
     }
   }
 
@@ -265,9 +258,11 @@ class App extends Component {
 
     if (boundingBoxes.length > 0) {
       boundingBoxes.forEach(elem => {
+        let coord = elem.parentElement.querySelector('.cropper-point.point-n').getBoundingClientRect();
+        // console.log(coord);
         let elemP = elem.getAttribute("data-cropperidentifier"); // unique property
         let cat = selectedButton; // current property
-        let dict = { key: elemP, category: cat };
+        let dict = { key: elemP, category: cat, coordinates: coord};
 
         // Check if dict with the same key already exists in boundingBoxCollection
         if (!this.state.boundingBoxCollection.some(item => item.key === elemP)) {
@@ -409,9 +404,14 @@ class App extends Component {
     const index = event.currentTarget.getAttribute("cropboxindex");
     if (index !== null) {
       const cropBoxIndex = parseInt(index, 10);
-      const updatedBoundingBoxCollection = [...this.state.boundingBoxCollection];
-      updatedBoundingBoxCollection.splice(cropBoxIndex, 1);
-      this.setState({ boundingBoxCollection: updatedBoundingBoxCollection });
+      const updatedCropBoxesData = this.state.cropBoxesData.filter((_, i) => i !== cropBoxIndex);
+      const updatedBoundingBoxCollection = this.state.boundingBoxCollection.filter((_, i) => i !== cropBoxIndex);
+  
+      this.setState({
+        cropBoxesData: updatedCropBoxesData,
+        boundingBoxCollection: updatedBoundingBoxCollection,
+      });
+  
       this.cropper.destroyCropBoxByIndex(cropBoxIndex);
     }
   };
@@ -455,7 +455,7 @@ class App extends Component {
         formData.append("modality", "printed");
 
         const response = await axios.post(
-          "10.4.16.80:5000/upload",
+          "http://localhost:5000/upload",
           formData,
           {
             headers: {
@@ -579,15 +579,13 @@ class App extends Component {
 
     for (let i = 0; i < datas.length; ++i) {
       let data = datas[i];
-      let ocrText =
-        cropBoxesData[i] && cropBoxesData[i].ocrText
-          ? cropBoxesData[i].ocrText
-          : "";
+      let ocrText = cropBoxesData[i] && cropBoxesData[i].ocrText ? cropBoxesData[i].ocrText : "";
       let actived = this.cropper.getNowCropBoxIndex() === i;
       let displaycolor = actived ? "#bee3f8" : "#ebf8ff";
       let boxShadow = actived ? "rgba(50, 50, 93, 0.25) 0px 50px 100px -20px, rgba(0, 0, 0, 0.3) 0px 30px 60px -30px" : "white";
 
       let collection = this.state.boundingBoxCollection[i];
+      
       let typex, colorx;
       if (collection) {
         typex = collection.category;
@@ -612,8 +610,13 @@ class App extends Component {
 
       const label = i + 1;
 
-      const labelPositionX = data.x + 20;
-      const labelPositionY = data.y + 100;
+      let labelPositionX, labelPositionY;
+
+      if(collection){
+        labelPositionX = collection.coordinates.x;
+        labelPositionY = collection.coordinates.y;
+        labelPositionY -= 40;
+      }
 
       res.push(
         <div
